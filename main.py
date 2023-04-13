@@ -1,6 +1,12 @@
-import vtk
-import numpy as np
+import os
+from pathlib import Path
 
+# change the current path to prog03_volren
+os.chdir(Path(__file__).parent)
+print(f"current path: {Path.cwd()}")
+
+import vtk
+from vtkEasyTransfer import vtkEasyTransfer
 
 
 # ----------------------------------------------------------------
@@ -29,6 +35,58 @@ class vtkSliderCallback(object):
         self.MarchingCubes.SetValue(0, sliderWidget.GetRepresentation().GetValue())
 
 
+# Callback for the button interaction
+class vtkButtonCallback(object):
+    def __init__(
+        self,
+        sliderWidget,
+        renderer,
+        actor,
+        renderWindow,
+        whiteRender,
+        renderWindowInteractor,
+        transferRenderer,
+        volume,
+        easyTransfer,
+        styleTrackball,
+    ):
+        self.sliderWidget = sliderWidget
+        self.renderer = renderer
+        self.actor = actor
+        self.renderWindow = renderWindow
+        self.whiteRender = whiteRender
+        self.renderWindowInteractor = renderWindowInteractor
+        self.transferRenderer = transferRenderer
+        self.volume = volume
+        self.easyTransfer = easyTransfer
+        self.styleTrackball = styleTrackball
+
+    def __call__(self, buttonWidget, eventId):
+        state = buttonWidget.GetSliderRepresentation().GetState()
+        # TASK 1 screen
+        if state == 0:
+            # disable TASK2
+            self.renderWindowInteractor.SetInteractorStyle(self.styleTrackball)
+            self.renderer.RemoveActor(self.volume)
+            self.renderWindow.RemoveRenderer(self.transferRenderer)
+
+            # add actor, renders and slider
+            self.sliderWidget.EnabledOn()
+            self.renderer.AddActor(self.actor)
+            self.renderWindow.AddRenderer(self.whiteRender)
+        # TASK 2 screen
+        else:
+            # disable TASK1
+            self.sliderWidget.EnabledOff()
+            self.renderer.RemoveActor(self.actor)
+            self.renderWindow.RemoveRenderer(self.whiteRender)
+
+            # add actor, volume and transfer function interactor
+            self.renderWindowInteractor.SetInteractorStyle(
+                self.easyTransfer.GetInteractorStyle()
+            )
+            self.renderer.AddActor(self.volume)
+            self.renderWindow.AddRenderer(self.transferRenderer)
 def main():
     # ----------------------------------------------------------------
     # create the renderer and window interactor
@@ -85,22 +143,25 @@ def main():
     buttonWidget.On()
 
     # ----------------------------------------------------------------
-    # read the volume data set
+    # read the data set
     # ----------------------------------------------------------------
     reader = vtk.vtkXMLImageDataReader()
-    reader.SetFileName("data/output.01000.vti")
+    reader.SetFileName("data/output.05000.vti")
+    reader.Update()
+
+    arraySelection = reader.GetPointDataArraySelection()
+    arraySelection.DisableAllArrays()
+    arraySelection.EnableArray('u')
     reader.Update()
 
     data = reader.GetOutput()
 
-    arrayFilter = vtk.vtkPassArrays()
-    arrayFilter.SetInputData(data)
-    arrayFilter.AddPointDataArray("rhof_1")
-    print(arrayFilter.GetOutput())
-
+    # ----------------------------------------------------------------
+    # marching cubes
+    # ----------------------------------------------------------------
     # extract the surface with vtkMarchingCubes
     isosurface = vtk.vtkMarchingCubes()
-    isosurface.SetInputConnection(arrayFilter.GetOutputPort(0))
+    isosurface.SetInputData(data)
     isosurface.SetValue(0, 300)
 
 
@@ -157,6 +218,53 @@ def main():
 
     # get mouse style for interactor
     styleTrackball = vtk.vtkInteractorStyleTrackballCamera()
+
+
+    # ----------------------------------------------------------------
+    # DirectVolume
+    # ----------------------------------------------------------------
+
+    rayCastMapper = vtk.vtkOpenGLGPUVolumeRayCastMapper()
+    rayCastMapper.SetInputData(data)
+
+    # create transfer function
+    easyTransfer = vtkEasyTransfer()
+    easyTransfer.SetColormapHeat()  # set initial color map
+    easyTransfer.SetColorRange(50, 255)  # set the value range that is mapped to color
+    easyTransfer.SetOpacityRange(
+        50, 255
+    )  # set the value range that is mapped to opacity
+    easyTransfer.RefreshImage()
+
+    # assign transfer function to volume properties
+    volumeProperty = vtk.vtkVolumeProperty()
+    volumeProperty.SetColor(easyTransfer.GetColorTransferFunction())
+    volumeProperty.SetScalarOpacity(easyTransfer.GetOpacityTransferFunction())
+
+    # create volume actor and assign mapper and properties
+    volume = vtk.vtkVolume()
+    volume.SetMapper(rayCastMapper)
+    volume.SetProperty(volumeProperty)
+
+    # get renderer for the transfer function editor or a white background
+    transferRenderer = easyTransfer.GetRenderer()
+    transferRenderer.SetViewport([0.66666, 0, 1, 1])
+
+
+    callbackButton = vtkButtonCallback(
+        sliderWidget=sliderWidget,
+        renderer=renderer,
+        actor=actor,
+        renderWindow=renderWindow,
+        whiteRender=whiteRender,
+        renderWindowInteractor=renderWindowInteractor,
+        transferRenderer=transferRenderer,
+        volume=volume,
+        easyTransfer=easyTransfer,
+        styleTrackball=styleTrackball,
+    )
+
+    buttonWidget.AddObserver("StateChangedEvent", callbackButton)
 
     # isosurfaqce slider
     sliderWidget.EnabledOn()
