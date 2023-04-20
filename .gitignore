@@ -1,2 +1,3 @@
 *.vti
 .idea
+__pycache__/
