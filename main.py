@@ -16,54 +16,67 @@ def main():
     renderWindowInteractor = vtk.vtkRenderWindowInteractor()
     renderWindowInteractor.SetRenderWindow(renderWindow)
 
-    # ----------------------------------------------------------------
-    # read the data set
-    # ----------------------------------------------------------------
-    reader = vtk.vtkXMLImageDataReader()
-    reader.SetFileName("data/output.15000.vti")
-    reader.Update()
-
-    arraySelection = reader.GetPointDataArraySelection()
-    arraySelection.DisableAllArrays()
-    arraySelection.EnableArray('theta')
-    reader.Update()
-
-    data = reader.GetOutput()
-    data.GetPointData().SetScalars(data.GetPointData().GetArray(0))
-
-    # ----------------------------------------------------------------
-    # marching cubes
-    # ----------------------------------------------------------------
-    # extract the surface with vtkMarchingCubes
-    isosurface = vtk.vtkMarchingCubes()
-    isosurface.SetInputData(data)
-    isosurface.SetValue(0, 300)
-
-    # apply a vtkPolyDataMapper to the output of marching cubes
-    dataMapper = vtk.vtkPolyDataMapper()
-    dataMapper.SetInputConnection(isosurface.GetOutputPort(0))
-    dataMapper.ScalarVisibilityOff()
-
-    # create a vtkActor and assign the mapper
-    actor = vtk.vtkActor()
-    actor.SetMapper(dataMapper)
-
     # get renderer for the white background and interactor style
     whiteRender = vtk.vtkRenderer()
     whiteRender.SetViewport([1, 0, 1, 1])
     whiteRender.SetBackground([1, 1, 1])
 
-    # get mouse style for interactor
-    styleTrackball = vtk.vtkInteractorStyle3D()
+    # ----------------------------------------------------------------
+    # read the data set
+    # ----------------------------------------------------------------
+    reader = vtk.vtkXMLImageDataReader()
+    reader.SetFileName("data/output.14000.vti")
+    reader.Update()
 
+    reader.GetOutput().GetPointData().SetScalars(reader.GetOutput().GetPointData().GetArray('rhof_1'))
 
     # ----------------------------------------------------------------
-    # DirectVolume
+    # Bulk Density of Dry Fuel
     # ----------------------------------------------------------------
+
+    # Create a threshold filter to select points with values above a threshold
+    threshold = vtk.vtkThresholdPoints()
+    threshold.SetInputConnection(reader.GetOutputPort())
+    threshold.ThresholdByUpper(0.2)
+    threshold.Update()
+
+    cylinderSource = vtk.vtkCylinderSource()
+    cylinderSource.SetHeight(0.5)
+    cylinderSource.SetRadius(0.1)
+    cylinderSource.Update()
+
+    transform = vtk.vtkTransform()
+    transform.RotateX(90)
+    transform.Update()
+
+    transformFilter = vtk.vtkTransformPolyDataFilter()
+    transformFilter.SetInputConnection(cylinderSource.GetOutputPort())
+    transformFilter.SetTransform(transform)
+    transformFilter.Update()
+
+    glyph3D = vtk.vtkGlyph3D()
+    glyph3D.SetInputConnection(threshold.GetOutputPort())
+    glyph3D.SetSourceConnection(transformFilter.GetOutputPort())
+    glyph3D.SetScaleModeToScaleByScalar()  # Map values to size of spheres
+    glyph3D.SetScaleFactor(50)  # Set a default scaling factor
+    glyph3D.Update()
+
+    mapper = vtk.vtkPolyDataMapper()
+    mapper.SetInputConnection(glyph3D.GetOutputPort())
+
+    actor = vtk.vtkActor()
+    actor.SetMapper(mapper)
+
+    # ----------------------------------------------------------------
+    # DirectVolume of Fire
+    # ----------------------------------------------------------------
+
+    reader.GetOutput().GetPointData().SetScalars(reader.GetOutput().GetPointData().GetArray('theta'))
 
     # raycast mapper
     rayCastMapper = vtk.vtkOpenGLGPUVolumeRayCastMapper()
-    rayCastMapper.SetInputData(data)
+    rayCastMapper.SetInputConnection(reader.GetOutputPort())
+    # rayCastMapper.SetInputData(data)
 
     min_value = 310
     max_value = 900
@@ -95,7 +108,7 @@ def main():
     volume.SetProperty(volumeProperty)
 
     # add actor and renders
-    # renderer.AddActor(actor) # UNCOMMENT THIS LINE TO GET THE MARCHING CUBE IMAGE
+    renderer.AddActor(actor)
     renderer.AddVolume(volume)
     renderWindow.AddRenderer(whiteRender)
 
