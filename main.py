@@ -1,6 +1,5 @@
+from re import M
 import vtk
-
-
 def main():
     # ----------------------------------------------------------------
     # create the renderer and window interactor
@@ -27,9 +26,9 @@ def main():
     reader = vtk.vtkXMLImageDataReader()
     reader.SetFileName("data/output.14000.vti")
     reader.Update()
-
+    #print(reader.GetOutput().GetPointData())
     reader.GetOutput().GetPointData().SetScalars(reader.GetOutput().GetPointData().GetArray('rhof_1'))
-
+    reader.Update()
     # ----------------------------------------------------------------
     # Bulk Density of Dry Fuel
     # ----------------------------------------------------------------
@@ -66,6 +65,8 @@ def main():
 
     actor = vtk.vtkActor()
     actor.SetMapper(mapper)
+
+
 
     # ----------------------------------------------------------------
     # DirectVolume of Fire
@@ -107,11 +108,36 @@ def main():
     volume.SetMapper(rayCastMapper)
     volume.SetProperty(volumeProperty)
 
+    # ----------------------------------------------------------------
+    # Wind Streamlines
+    # ----------------------------------------------------------------
+
+
+    
+    # ----------------------------------------------------------------
+    # Circle for debuging
+    # ----------------------------------------------------------------
+    colors = vtk.vtkNamedColors()
+    sphereSource = vtk.vtkSphereSource()
+    sphereSource.SetCenter(300.0, 300.0, 300.0)
+    sphereSource.SetRadius(30.0);
+    # Make the surface smooth.
+    sphereSource.SetPhiResolution(100)
+    sphereSource.SetThetaResolution(100)
+
+    newmapper = vtk.vtkPolyDataMapper()
+    newmapper.SetInputConnection(sphereSource.GetOutputPort())
+
+    sphereactor = vtk.vtkActor()
+    sphereactor.SetMapper(newmapper)
+    #sphereactor.GetProperty().SetColor(colors.GetColor3d("Cornsilk").GetData())
+
     # add actor and renders
     renderer.AddActor(actor)
     renderer.AddVolume(volume)
     renderWindow.AddRenderer(whiteRender)
-
+    #renderer.AddActor(sphereactor)
+    
     # enter the rendering loop
     renderWindow.Render()
     renderWindowInteractor.Start()
