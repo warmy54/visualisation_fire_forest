@@ -1,5 +1,6 @@
 from re import M
 import vtk
+import anim
 def main():
     # ----------------------------------------------------------------
     # create the renderer and window interactor
@@ -24,7 +25,7 @@ def main():
     # read the data set
     # ----------------------------------------------------------------
     reader = vtk.vtkXMLImageDataReader()
-    reader.SetFileName("data/output.14000.vti")
+    reader.SetFileName("data/output.01000.vti")
     reader.Update()
     #print(reader.GetOutput().GetPointData())
     reader.GetOutput().GetPointData().SetScalars(reader.GetOutput().GetPointData().GetArray('rhof_1'))
@@ -131,6 +132,13 @@ def main():
     sphereactor = vtk.vtkActor()
     sphereactor.SetMapper(newmapper)
     #sphereactor.GetProperty().SetColor(colors.GetColor3d("Cornsilk").GetData())
+
+    camera = vtk.vtkCamera()
+    camera.SetPosition(1700,0,1500)
+    camera.SetFocalPoint(0,0,0)
+    camera.Roll(270)
+    renderer.SetActiveCamera(camera)
+
 
     # add actor and renders
     renderer.AddActor(actor)
