@@ -125,9 +125,10 @@ def main():
     reslice = vtk.vtkImageReslice()
     reslice.SetInputConnection(reader.GetOutputPort())
     reslice.SetOutputDimensionality(2)
-    reslice.SetInterpolationModeToLinear()
-    reslice.SetResliceAxesOrigin(0, 0, 0.5)
-    reslice.SetResliceAxesDirectionCosines(1, 0, 0, 0, 1, 0, 0, 0, 1)
+    # reslice.SetInterpolationModeToLinear()
+    reslice.SetResliceAxesDirectionCosines(1, 0, 0, 0, 0, 1, 0, 1, 0)
+    reslice.SetResliceAxesOrigin(0, 125, 0)
+    reslice.Update()
 
     reslice.GetOutput().GetPointData().SetVectors(vectorfield.GetOutput().GetPointData().GetArray('combinationVector'))
     print(reslice.GetOutput())
