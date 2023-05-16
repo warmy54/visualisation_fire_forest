@@ -122,28 +122,33 @@ def main():
     # LIC
     # ----------------------------------------------------------------
 
+    reader.GetOutput().GetPointData().SetVectors(vectorfield.GetOutput().GetPointData().GetArray('combinationVector'))
+    reader.GetOutput().GetPointData().SetActiveVectors('combinationVector')
+    reader.Update()
+
+    print(reader.GetOutput())
+
     reslice = vtk.vtkImageReslice()
     reslice.SetInputConnection(reader.GetOutputPort())
+    reslice.SetInputArrayToProcess(0, 0, 0, 0, 'combinationVector')
     reslice.SetOutputDimensionality(2)
     # reslice.SetInterpolationModeToLinear()
     reslice.SetResliceAxesDirectionCosines(1, 0, 0, 0, 0, 1, 0, 1, 0)
     reslice.SetResliceAxesOrigin(0, 125, 0)
     reslice.Update()
 
-    reslice.GetOutput().GetPointData().SetVectors(vectorfield.GetOutput().GetPointData().GetArray('combinationVector'))
     print(reslice.GetOutput())
-    reslice.GetOutput().GetPointData().SetActiveVectors('combinationVector')
 
-    lic = vtk.vtkImageDataLIC2D()
-    lic.SetInputConnection(reslice.GetOutputPort())
-    lic.SetSteps(500)
-    lic.SetStepSize(0.1)
-    lic.Update()
-
-    mapper = vtk.vtkPolyDataMapper2D()
-    mapper.SetInputConnection(lic.GetOutputPort())
-    actor = vtk.vtkActor2D()
-    actor.SetMapper(mapper)
+    # lic = vtk.vtkImageDataLIC2D()
+    # lic.SetInputConnection(reslice.GetOutputPort())
+    # lic.SetSteps(500)
+    # lic.SetStepSize(0.1)
+    # lic.Update()
+    #
+    # mapper = vtk.vtkPolyDataMapper2D()
+    # mapper.SetInputConnection(lic.GetOutputPort())
+    # actor = vtk.vtkActor2D()
+    # actor.SetMapper(mapper)
 
 
     # add actor and renders
