@@ -3,11 +3,12 @@ import vtk
 
 # Callback for the slider interaction
 class vtkSliderCallback(object):
-    def __init__(self, ExtractVOI):
-        self.ExtractVOI = ExtractVOI
+    def __init__(self, reslice):
+        self.reslice = reslice
 
     def __call__(self, sliderWidget, eventId):
-        self.ExtractVOI.SetVOI(0, 299, 0, int(sliderWidget.GetRepresentation().GetValue()), 0, 149)
+        self.reslice.SetResliceAxesOrigin(0, int(sliderWidget.GetRepresentation().GetValue()), 0)
+
 
 def main():
     # ----------------------------------------------------------------
@@ -52,10 +53,10 @@ def main():
     # Bulk Density of Dry Fuel
     # ----------------------------------------------------------------
 
-    subset = vtk.vtkExtractVOI()
-    subset.SetInputConnection(reader.GetOutputPort())
-    subset.SetVOI(0, 299, 0, 100, 0, 149)
-    subset.Update()
+    # subset = vtk.vtkExtractVOI()
+    # subset.SetInputConnection(reader.GetOutputPort())
+    # subset.SetVOI(0, 299, 0, 100, 0, 149)
+    # subset.Update()
 
     # create a 2D slider
     sliderRep = vtk.vtkSliderRepresentation2D()
@@ -80,14 +81,22 @@ def main():
     sliderWidget.SetRepresentation(sliderRep)
     sliderWidget.SetAnimationModeToAnimate()
 
+    reslice = vtk.vtkImageReslice()
+    reslice.SetInputConnection(reader.GetOutputPort())
+    reslice.SetOutputDimensionality(2)
+    # reslice.SetInterpolationModeToLinear()
+    reslice.SetResliceAxesDirectionCosines(1, 0, 0, 0, 0, 1, 0, 1, 0)
+    reslice.SetResliceAxesOrigin(0, 125, 0)
+    reslice.Update()
+
     # create the callback
-    callback = vtkSliderCallback(subset)
+    callback = vtkSliderCallback(reslice)
     sliderWidget.AddObserver("InteractionEvent", callback)
     sliderWidget.EnabledOn()
 
     # Create a threshold filter to select points with values above a threshold
     threshold = vtk.vtkThresholdPoints()
-    threshold.SetInputConnection(subset.GetOutputPort())
+    threshold.SetInputConnection(reslice.GetOutputPort())
     threshold.ThresholdByUpper(0.2)
     threshold.Update()
 
@@ -122,22 +131,13 @@ def main():
     # LIC
     # ----------------------------------------------------------------
 
-    reader.GetOutput().GetPointData().SetVectors(vectorfield.GetOutput().GetPointData().GetArray('combinationVector'))
-    reader.GetOutput().GetPointData().SetActiveVectors('combinationVector')
-    reader.Update()
-
-    print(reader.GetOutput())
-
-    reslice = vtk.vtkImageReslice()
-    reslice.SetInputConnection(reader.GetOutputPort())
-    reslice.SetInputArrayToProcess(0, 0, 0, 0, 'combinationVector')
-    reslice.SetOutputDimensionality(2)
-    # reslice.SetInterpolationModeToLinear()
-    reslice.SetResliceAxesDirectionCosines(1, 0, 0, 0, 0, 1, 0, 1, 0)
-    reslice.SetResliceAxesOrigin(0, 125, 0)
-    reslice.Update()
-
-    print(reslice.GetOutput())
+    # reader.GetOutput().GetPointData().SetVectors(vectorfield.GetOutput().GetPointData().GetArray('combinationVector'))
+    # reader.GetOutput().GetPointData().SetActiveVectors('combinationVector')
+    # reader.Update()
+    #
+    # print(reader.GetOutput())
+    #
+    # print(reslice.GetOutput())
 
     # lic = vtk.vtkImageDataLIC2D()
     # lic.SetInputConnection(reslice.GetOutputPort())
