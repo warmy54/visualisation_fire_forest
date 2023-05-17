@@ -3,11 +3,15 @@ import vtk
 
 # Callback for the slider interaction
 class vtkSliderCallback(object):
-    def __init__(self, reslice):
-        self.reslice = reslice
+    def __init__(self, r_u, r_v, r_w):
+        self.r_u = r_u
+        self.r_v = r_v
+        self.r_w = r_w
 
     def __call__(self, sliderWidget, eventId):
-        self.reslice.SetResliceAxesOrigin(0, int(sliderWidget.GetRepresentation().GetValue()), 0)
+        self.r_u.SetResliceAxesOrigin(0, int(sliderWidget.GetRepresentation().GetValue()), 0)
+        self.r_v.SetResliceAxesOrigin(0, int(sliderWidget.GetRepresentation().GetValue()), 0)
+        self.r_w.SetResliceAxesOrigin(0, int(sliderWidget.GetRepresentation().GetValue()), 0)
 
 
 def main():
@@ -37,17 +41,17 @@ def main():
     reader.SetFileName("data/output.14000.vti")
     reader.Update()
 
-    vectorfield = vtk.vtkMergeVectorComponents()
-    vectorfield.SetInputConnection(reader.GetOutputPort())
-    vectorfield.SetInputArrayToProcess(0, 0, 0, 0, 'u')
-    vectorfield.SetInputArrayToProcess(1, 0, 0, 0, 'v')
-    vectorfield.SetInputArrayToProcess(2, 0, 0, 0, 'w')
-    vectorfield.SetXArrayName('u')
-    vectorfield.SetYArrayName('v')
-    vectorfield.SetZArrayName('w')
-    vectorfield.Update()
+    # vectorfield = vtk.vtkMergeVectorComponents()
+    # vectorfield.SetInputConnection(reader.GetOutputPort())
+    # vectorfield.SetInputArrayToProcess(0, 0, 0, 0, 'u')
+    # vectorfield.SetInputArrayToProcess(1, 0, 0, 0, 'v')
+    # vectorfield.SetInputArrayToProcess(2, 0, 0, 0, 'w')
+    # vectorfield.SetXArrayName('u')
+    # vectorfield.SetYArrayName('v')
+    # vectorfield.SetZArrayName('w')
+    # vectorfield.Update()
 
-    reader.GetOutput().GetPointData().SetScalars(reader.GetOutput().GetPointData().GetArray('rhof_1'))
+    reader.GetOutput().GetPointData().SetScalars(reader.GetOutput().GetPointData().GetArray('u'))
 
     # ----------------------------------------------------------------
     # Bulk Density of Dry Fuel
@@ -81,22 +85,71 @@ def main():
     sliderWidget.SetRepresentation(sliderRep)
     sliderWidget.SetAnimationModeToAnimate()
 
-    reslice = vtk.vtkImageReslice()
-    reslice.SetInputConnection(reader.GetOutputPort())
-    reslice.SetOutputDimensionality(2)
-    # reslice.SetInterpolationModeToLinear()
-    reslice.SetResliceAxesDirectionCosines(1, 0, 0, 0, 0, 1, 0, 1, 0)
-    reslice.SetResliceAxesOrigin(0, 125, 0)
-    reslice.Update()
+    reslice_u = vtk.vtkImageReslice()
+    reslice_u.SetInputConnection(reader.GetOutputPort())
+    reslice_u.SetOutputDimensionality(2)
+    reslice_u.SetResliceAxesDirectionCosines(1, 0, 0, 0, 0, 1, 0, 1, 0)
+    reslice_u.SetResliceAxesOrigin(0, 125, 0)
+    reslice_u.Update()
+
+    reader.GetOutput().GetPointData().SetScalars(reader.GetOutput().GetPointData().GetArray('v'))
+
+    reslice_v = vtk.vtkImageReslice()
+    reslice_v.SetInputConnection(reader.GetOutputPort())
+    reslice_v.SetOutputDimensionality(2)
+    reslice_v.SetResliceAxesDirectionCosines(1, 0, 0, 0, 0, 1, 0, 1, 0)
+    reslice_v.SetResliceAxesOrigin(0, 125, 0)
+    reslice_v.Update()
+
+    reader.GetOutput().GetPointData().SetScalars(reader.GetOutput().GetPointData().GetArray('w'))
+
+    reslice_w = vtk.vtkImageReslice()
+    reslice_w.SetInputConnection(reader.GetOutputPort())
+    reslice_w.SetOutputDimensionality(2)
+    reslice_w.SetResliceAxesDirectionCosines(1, 0, 0, 0, 0, 1, 0, 1, 0)
+    reslice_w.SetResliceAxesOrigin(0, 125, 0)
+    reslice_w.Update()
+
+    reader.GetOutput().GetPointData().SetScalars(reslice_u.GetOutput().GetPointData().GetArray('ImageScalars'))
+
+
+    rename_u = vtk.vtkArrayRename()
+    rename_u.SetInputConnection(reader.GetOutputPort())
+    rename_u.SetArrayName(0, 8, "u_slice")
+    rename_u.Update()
+
+    rename_u.GetOutput().GetPointData().SetScalars(reslice_v.GetOutput().GetPointData().GetArray('ImageScalars'))
+
+    rename_v = vtk.vtkArrayRename()
+    rename_v.SetInputConnection(rename_u.GetOutputPort())
+    rename_v.SetArrayName(0, 9, "v_slice")
+    rename_v.Update()
+
+    rename_v.GetOutput().GetPointData().SetScalars(reslice_w.GetOutput().GetPointData().GetArray('ImageScalars'))
+
+    rename_w = vtk.vtkArrayRename()
+    rename_w.SetInputConnection(rename_v.GetOutputPort())
+    rename_w.SetArrayName(0, 10, "w_slice")
+    rename_w.Update()
+
+    vectorfield = vtk.vtkMergeVectorComponents()
+    vectorfield.SetInputConnection(rename_w.GetOutputPort())
+    vectorfield.SetInputArrayToProcess(0, 0, 0, 0, 'u_slice')
+    vectorfield.SetInputArrayToProcess(1, 0, 0, 0, 'v_slice')
+    vectorfield.SetInputArrayToProcess(2, 0, 0, 0, 'w_slice')
+    vectorfield.SetXArrayName('u_slice')
+    vectorfield.SetYArrayName('v_slice')
+    vectorfield.SetZArrayName('w_slice')
+    vectorfield.Update()
 
     # create the callback
-    callback = vtkSliderCallback(reslice)
+    callback = vtkSliderCallback(reslice_u, reslice_v, reslice_w)
     sliderWidget.AddObserver("InteractionEvent", callback)
     sliderWidget.EnabledOn()
 
     # Create a threshold filter to select points with values above a threshold
     threshold = vtk.vtkThresholdPoints()
-    threshold.SetInputConnection(reslice.GetOutputPort())
+    threshold.SetInputConnection(reslice_u.GetOutputPort())
     threshold.ThresholdByUpper(0.2)
     threshold.Update()
 
@@ -131,24 +184,24 @@ def main():
     # LIC
     # ----------------------------------------------------------------
 
-    # reader.GetOutput().GetPointData().SetVectors(vectorfield.GetOutput().GetPointData().GetArray('combinationVector'))
+    reslice_w.GetOutput().GetPointData().SetVectors(vectorfield.GetOutput().GetPointData().GetArray('combinationVector'))
     # reader.GetOutput().GetPointData().SetActiveVectors('combinationVector')
     # reader.Update()
     #
-    # print(reader.GetOutput())
+    print(reslice_w.GetOutput())
     #
     # print(reslice.GetOutput())
 
-    # lic = vtk.vtkImageDataLIC2D()
-    # lic.SetInputConnection(reslice.GetOutputPort())
-    # lic.SetSteps(500)
-    # lic.SetStepSize(0.1)
-    # lic.Update()
-    #
-    # mapper = vtk.vtkPolyDataMapper2D()
-    # mapper.SetInputConnection(lic.GetOutputPort())
-    # actor = vtk.vtkActor2D()
-    # actor.SetMapper(mapper)
+    lic = vtk.vtkImageDataLIC2D()
+    lic.SetInputConnection(reslice_w.GetOutputPort())
+    lic.SetSteps(500)
+    lic.SetStepSize(0.1)
+    lic.Update()
+
+    mapper = vtk.vtkPolyDataMapper2D()
+    mapper.SetInputConnection(lic.GetOutputPort())
+    actor = vtk.vtkActor2D()
+    actor.SetMapper(mapper)
 
 
     # add actor and renders
