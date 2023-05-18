@@ -119,7 +119,8 @@ def main():
     # ----------------------------------------------------------------
     colors = vtk.vtkNamedColors()
     sphereSource = vtk.vtkSphereSource()
-    sphereSource.SetCenter(300.0, 300.0, 300.0)
+    sphereSource.SetCenter(0.0, 300.0, 300.0)
+    sphereSource.SetCenter(0.0, -300.0, 300.0)
     sphereSource.SetRadius(30.0);
     # Make the surface smooth.
     sphereSource.SetPhiResolution(100)
@@ -136,7 +137,7 @@ def main():
     renderer.AddActor(actor)
     renderer.AddVolume(volume)
     renderWindow.AddRenderer(whiteRender)
-    #renderer.AddActor(sphereactor)
+    renderer.AddActor(sphereactor)
     
     # enter the rendering loop
     renderWindow.Render()

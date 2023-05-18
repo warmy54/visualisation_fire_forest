@@ -32,8 +32,13 @@ def main():
     #            print(x)
     #            print(y)
     #            print(z)
+    mapper = renderStreamMapper(300,300,300,"data/output.14000.vti")
 
-    renderer.AddActor(renderStream(300,300,300,"data/output.14000.vti"))
+    streamLineActor = vtk.vtkActor()
+    streamLineActor.SetMapper(mapper)
+    streamLineActor.VisibilityOn();
+
+    renderer.AddActor(streamLineActor)
     #renderer.AddVolume(volume)
     renderWindow.AddRenderer(whiteRender)
 
@@ -45,7 +50,13 @@ def main():
 
 
 
-def renderStream(x,y,z,file):
+def renderStreamMapper(x,y,z,file):
+
+    line1 = vtk.vtkLineSource()
+    line1.SetResolution(100)
+    line1.SetPoint1(0.0, 300.0, 250.0)
+    line1.SetPoint2(0.0, -300.0, 250.0)
+
     #print(a)
     reader = vtk.vtkXMLImageDataReader()
     reader.SetFileName(file)
@@ -69,13 +80,13 @@ def renderStream(x,y,z,file):
 
     data = vtk.vtkImageData()
     
-    data.GetPointData().SetVectors(merge.GetOutput().GetPointData().GetArray("combinationVector"))
-    data.GetPointData().SetActiveVectors("combinationVector")
+    merge.GetOutput().GetPointData().SetVectors(merge.GetOutput().GetPointData().GetArray("combinationVector"))
+    merge.GetOutput().GetPointData().SetActiveVectors("combinationVector")
 
     streamline = vtk.vtkStreamTracer()
     streamline.DebugOn()
-    streamline.SetInputData(data)
-    streamline.SetStartPosition(x,y,z)
+    streamline.SetInputConnection(merge.GetOutputPort())
+    streamline.SetSourceConnection(line1.GetOutputPort())
     streamline.SetIntegratorTypeToRungeKutta4()
     streamline.SetIntegrationDirectionToForward()
     streamline.Update()
@@ -98,12 +109,8 @@ def renderStream(x,y,z,file):
     mapper.SetInputConnection(streamline.GetOutputPort())
 
 
-    streamLineActor = vtk.vtkActor()
-    streamLineActor.SetMapper(mapper)
-    streamLineActor.VisibilityOn();
-
     #streamLineActor.GetProperty().SetColor(1, 0, 0)  # Set the color to red
 
-    return streamLineActor
+    return mapper
 
 main()

@@ -1,3 +1,4 @@
 *.vti
 .idea
 __pycache__/
+vs/*
