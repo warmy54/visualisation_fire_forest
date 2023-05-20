@@ -2,6 +2,16 @@ import vtk
 
 
 
+# Callback for the slider interaction
+class vtkSliderCallback(object):
+    def __init__(self, seedline):
+        self.seedline = seedline
+
+    def __call__(self, sliderWidget, eventId):
+        self.seedline.SetPoint1(0.0, 300.0, sliderWidget.GetRepresentation().GetValue())
+        self.seedline.SetPoint2(0.0, -300.0, sliderWidget.GetRepresentation().GetValue())
+
+
 def main():
     
 
@@ -21,6 +31,39 @@ def main():
     whiteRender.SetViewport([1, 0, 1, 1])
     whiteRender.SetBackground([1, 1, 1])
 
+    # create a 2D slider
+    sliderRep = vtk.vtkSliderRepresentation2D()
+    sliderRep.SetMinimumValue(200)
+    sliderRep.SetMaximumValue(300)
+    sliderRep.SetValue(210)
+    sliderRep.SetTitleText("Seedline height")
+    # set color properties
+    sliderRep.GetSliderProperty().SetColor(0.2, 0.2, 0.6)  # Change the color of the knob that slides
+    sliderRep.GetTitleProperty().SetColor(0, 0, 0)  # Change the color of the text indicating what the slider controls
+    sliderRep.GetLabelProperty().SetColor(0, 0, 0.4)  # Change the color of the text displaying the value
+    sliderRep.GetSelectedProperty().SetColor(0.4, 0.8, 0.4)  # Change the color of the knob when the mouse is held on it
+    sliderRep.GetTubeProperty().SetColor(0.7, 0.7, 0.7)  # Change the color of the bar
+    sliderRep.GetCapProperty().SetColor(0.7, 0.7, 0.7)  # Change the color of the ends of the bar
+    # set position of the slider
+    sliderRep.GetPoint1Coordinate().SetCoordinateSystemToDisplay()
+    sliderRep.GetPoint1Coordinate().SetValue(40, 100)
+    sliderRep.GetPoint2Coordinate().SetCoordinateSystemToDisplay()
+    sliderRep.GetPoint2Coordinate().SetValue(200, 100)
+    sliderWidget = vtk.vtkSliderWidget()
+    sliderWidget.SetInteractor(renderWindowInteractor)
+    sliderWidget.SetRepresentation(sliderRep)
+    sliderWidget.SetAnimationModeToAnimate()
+
+    seedline = vtk.vtkLineSource()
+    seedline.SetResolution(100)
+    seedline.SetPoint1(0.0, 300.0, 250.0)
+    seedline.SetPoint2(0.0, -300.0, 250.0)
+
+    # create the callback
+    callback = vtkSliderCallback(seedline)
+    sliderWidget.AddObserver("InteractionEvent", callback)
+    sliderWidget.EnabledOn()
+
     # add actor and renders
     #renderer.AddActor(actor)
     step = 100
@@ -32,7 +75,7 @@ def main():
     #            print(x)
     #            print(y)
     #            print(z)
-    mapper = renderStreamMapper(300,300,300,"data/output.14000.vti")
+    mapper = renderStreamMapper(seedline, "data/output.14000.vti")
 
     streamLineActor = vtk.vtkActor()
     streamLineActor.SetMapper(mapper)
@@ -50,12 +93,7 @@ def main():
 
 
 
-def renderStreamMapper(x,y,z,file):
-
-    line1 = vtk.vtkLineSource()
-    line1.SetResolution(100)
-    line1.SetPoint1(0.0, 300.0, 250.0)
-    line1.SetPoint2(0.0, -300.0, 250.0)
+def renderStreamMapper(seedline, file):
 
     #print(a)
     reader = vtk.vtkXMLImageDataReader()
@@ -86,7 +124,7 @@ def renderStreamMapper(x,y,z,file):
     streamline = vtk.vtkStreamTracer()
     streamline.DebugOn()
     streamline.SetInputConnection(merge.GetOutputPort())
-    streamline.SetSourceConnection(line1.GetOutputPort())
+    streamline.SetSourceConnection(seedline.GetOutputPort())
     streamline.SetIntegratorTypeToRungeKutta4()
     streamline.SetIntegrationDirectionToForward()
     streamline.Update()
