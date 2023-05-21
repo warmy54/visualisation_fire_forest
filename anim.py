@@ -1,9 +1,11 @@
+from pickle import FALSE
 import random
 import time
 import vtk
-
+from steam import renderStreamMapper
+from steam import renderStreamMapper
 class vtkTimerCallback():
-    def __init__(self, steps, iren, actor, fuelmappers,volume, volumemappers):
+    def __init__(self, steps, iren, actor, fuelmappers,volume, volumemappers,streamActor, streamMappers,names):
         self.timer_count = 0
         self.steps = steps
         self.actor = actor
@@ -13,6 +15,9 @@ class vtkTimerCallback():
         self.lock = False
         self.volume = volume
         self.volumemappers = volumemappers
+        self.streamActor = streamActor
+        self.streamMappers = streamMappers
+        self.names = names
         
 
     def execute(self, obj, event):
@@ -20,12 +25,19 @@ class vtkTimerCallback():
         if self.lock:
             return
         self.lock = True
-        while self.timer_count < self.steps -1:
+        while self.timer_count < self.steps :
             print(self.timer_count)
-            fuelmapper = self.fuelmappers[self.timer_count]
-            volumemapper = self.volumemappers[self.timer_count]
+            fuelmapper = self.fuelmappers[0]
+            volumemapper = self.volumemappers[0]
+            streamMapper = renderStreamMapper(self.names[self.timer_count])
+            
+            self.fuelmappers.remove(self.fuelmappers[0])
+            self.volumemappers.remove(self.volumemappers[0])
+            
+            
             self.actor.SetMapper(fuelmapper)
             self.volume.SetMapper(volumemapper)
+            self.streamActor.SetMapper(streamMapper)
             self.iren = obj
             self.iren.GetRenderWindow().Render()
             self.iren.ProcessEvents()
@@ -57,15 +69,23 @@ def main():
     # ----------------------------------------------------------------
     # read the data set
     # ----------------------------------------------------------------
+    names = []
     fuelMappers = []
     volumeMappers = []
+    streamMappers = []
+    stream = False
     for step in range(1,16):
+        print(step)
+
         reader = vtk.vtkXMLImageDataReader()
         if step < 10:
-            reader.SetFileName("data/output.0"+str(step)+"000.vti")
+            name = "visualisation_fire_forest/data/output.0"+str(step)+"000.vti"
         else:
-            reader.SetFileName("data/output."+str(step)+"000.vti")
+            name = "visualisation_fire_forest/data/output."+str(step)+"000.vti"
+        reader.SetFileName(name)
+        names.append(name)
         reader.Update()
+
         #print(reader.GetOutput().GetPointData())
         reader.GetOutput().GetPointData().SetScalars(reader.GetOutput().GetPointData().GetArray('rhof_1'))
         reader.Update()
@@ -112,6 +132,10 @@ def main():
         rayCastMapper = vtk.vtkOpenGLGPUVolumeRayCastMapper()
         rayCastMapper.SetInputConnection(reader.GetOutputPort())
         volumeMappers.append(rayCastMapper)
+        
+        if stream == False: 
+            streamMappers.append(renderStreamMapper(name))
+            stream = True
         # rayCastMapper.SetInputData(data)
 
     min_value = 310
@@ -147,11 +171,17 @@ def main():
     fuelActor = vtk.vtkActor()
     fuelActor.SetMapper(fuelMappers[0])
 
+    streamActor = vtk.vtkActor()
+    streamActor.SetMapper(streamMappers[0])
+    
     renderer.AddActor(fuelActor)
     renderer.AddVolume(volume)
+    renderer.AddActor(streamActor)
     
+
+
     camera = vtk.vtkCamera()
-    camera.SetPosition(1700,0,500)
+    camera.SetPosition(1000,600,500)
     camera.SetFocalPoint(0,0,0)
     camera.Roll(270)
     camera.SetThickness(2500);
@@ -164,7 +194,7 @@ def main():
     renderWindowInteractor.Initialize()
 
     # Sign up to receive TimerEvent
-    cb = vtkTimerCallback(16, renderWindowInteractor, fuelActor, fuelMappers, volume, volumeMappers)
+    cb = vtkTimerCallback(13, renderWindowInteractor, fuelActor, fuelMappers, volume, volumeMappers,streamActor, streamMappers,names)
     renderWindowInteractor.AddObserver('TimerEvent', cb.execute)
     cb.timerId = renderWindowInteractor.CreateRepeatingTimer(500)
 

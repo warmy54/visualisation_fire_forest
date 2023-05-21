@@ -148,10 +148,10 @@ def main():
 
 
     # add actor and renders
-    #renderer.AddActor(actor)
-    renderer.AddVolume(volume)
+    renderer.AddActor(actor)
+    #renderer.AddVolume(volume)
     #renderWindow.AddRenderer(whiteRender)
-    renderer.AddActor(streamLineActor)
+    #renderer.AddActor(streamLineActor)
     #renderer.AddActor(sphereactor)
     
     # enter the rendering loop

@@ -32,7 +32,7 @@ def main():
     #            print(x)
     #            print(y)
     #            print(z)
-    mapper = renderStreamMapper(300,300,300,"data/output.14000.vti")
+    mapper = renderStreamMapper("data/output.14000.vti")
 
     streamLineActor = vtk.vtkActor()
     streamLineActor.SetMapper(mapper)
@@ -46,16 +46,16 @@ def main():
     # enter the rendering loop
     renderWindow.Render()
     renderWindowInteractor.Start()
-    print("done")
+    #print("done")
 
+    
 
-
-def renderStreamMapper(x,y,z,file):
+def renderStreamMapper(file):
 
     line1 = vtk.vtkLineSource()
-    line1.SetResolution(100)
-    line1.SetPoint1(0.0, 300.0, 250.0)
-    line1.SetPoint2(0.0, -300.0, 250.0)
+    line1.SetResolution(80)
+    line1.SetPoint1(0.0, 300.0, 220.0)
+    line1.SetPoint2(0.0, -300.0, 220.0)
 
     #print(a)
     reader = vtk.vtkXMLImageDataReader()
@@ -90,8 +90,8 @@ def renderStreamMapper(x,y,z,file):
     streamline.SetIntegratorTypeToRungeKutta4()
     streamline.SetIntegrationDirectionToForward()
     streamline.Update()
-    print(data)
-    print(streamline)
+    #print(data)
+    #print(streamline)
     streamline.SetMaximumPropagation(500)
     streamline.SetInitialIntegrationStep(0.1)
     streamline.SetIntegrationDirectionToBoth()
@@ -113,4 +113,6 @@ def renderStreamMapper(x,y,z,file):
 
     return mapper
 
-main()
+
+if __name__ == "__main__":
+    main()
