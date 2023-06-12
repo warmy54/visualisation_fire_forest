@@ -51,7 +51,8 @@ def main():
     volumeMappers = []
     streamMappers = []
 
-    for step in range(1, 16):
+    # Only animate relevant time steps to conserve ram usage
+    for step in range(5, 16):
         print(step)
 
         reader = vtk.vtkXMLImageDataReader()
