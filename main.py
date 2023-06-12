@@ -1,12 +1,21 @@
 from re import M
 import vtk
-from steam import renderStreamMapper
-def main():
-    # ----------------------------------------------------------------
-    # create the renderer and window interactor
-    # ----------------------------------------------------------------
+
+
+# Callback for the slider interaction
+class vtkSliderCallback(object):
+    def __init__(self, seedline):
+        self.seedline = seedline
+
+    def __call__(self, sliderWidget, eventId):
+        self.seedline.SetPoint1(0.0, 300.0, sliderWidget.GetRepresentation().GetValue())
+        self.seedline.SetPoint2(0.0, -300.0, sliderWidget.GetRepresentation().GetValue())
+
+
+# Render Window and Interactor
+def getRendererRenderWindowAndInteractor(w, h):
     renderWindow = vtk.vtkRenderWindow()
-    renderWindow.SetSize(1200, 800)
+    renderWindow.SetSize(w, h)
 
     renderer = vtk.vtkRenderer()
     renderer.SetViewport(0, 0, 1.0, 1.0)
@@ -15,25 +24,52 @@ def main():
 
     renderWindowInteractor = vtk.vtkRenderWindowInteractor()
     renderWindowInteractor.SetRenderWindow(renderWindow)
+    return renderer, renderWindow, renderWindowInteractor
 
-    # get renderer for the white background and interactor style
-    whiteRender = vtk.vtkRenderer()
-    whiteRender.SetViewport([1, 0, 1, 1])
-    whiteRender.SetBackground([1, 1, 1])
 
-    # ----------------------------------------------------------------
-    # read the data set
-    # ----------------------------------------------------------------
-    reader = vtk.vtkXMLImageDataReader()
-    name = "visualisation_fire_forest/data/output.14000.vti"
-    reader.SetFileName(name)
-    reader.Update()
-    #print(reader.GetOutput().GetPointData())
+# Streamlines
+def getStreamLineMapper(reader, seedline):
+
+    merge = vtk.vtkMergeVectorComponents()
+    merge.SetInputConnection(reader.GetOutputPort())
+    merge.SetInputArrayToProcess(0, 0, 0, 0, "u")
+    merge.SetInputArrayToProcess(1, 0, 0, 0, "v")
+    merge.SetInputArrayToProcess(2, 0, 0, 0, "w")
+    merge.SetXArrayName("u")
+    merge.SetYArrayName("v")
+    merge.SetZArrayName("w")
+    merge.Update()
+
+    merge.GetOutput().GetPointData().SetVectors(merge.GetOutput().GetPointData().GetArray("combinationVector"))
+    merge.GetOutput().GetPointData().SetActiveVectors("combinationVector")
+
+    streamline = vtk.vtkStreamTracer()
+    streamline.SetInputConnection(merge.GetOutputPort())
+    streamline.SetSourceConnection(seedline.GetOutputPort())
+    streamline.SetIntegratorTypeToRungeKutta4()
+    streamline.SetMaximumPropagation(500)
+    streamline.SetInitialIntegrationStep(0.1)
+    streamline.SetIntegrationDirectionToBoth()
+    streamline.Update()
+
+    streamTube = vtk.vtkTubeFilter()
+    streamTube.SetInputConnection(streamline.GetOutputPort())
+    streamTube.SetRadius(0.02)
+    streamTube.SetNumberOfSides(15)
+    streamTube.SetVaryRadiusToVaryRadiusByVector()
+    streamTube.Update()
+
+    mapper = vtk.vtkPolyDataMapper()
+    mapper.SetInputConnection(streamline.GetOutputPort())
+
+    return mapper
+
+
+# Bulk Density of Dry Fuel
+def getDryFuelMapper(reader):
+    # Set Scalar field
     reader.GetOutput().GetPointData().SetScalars(reader.GetOutput().GetPointData().GetArray('rhof_1'))
     reader.Update()
-    # ----------------------------------------------------------------
-    # Bulk Density of Dry Fuel
-    # ----------------------------------------------------------------
 
     # Create a threshold filter to select points with values above a threshold
     threshold = vtk.vtkThresholdPoints()
@@ -41,20 +77,24 @@ def main():
     threshold.ThresholdByUpper(0.2)
     threshold.Update()
 
+    # cylinder source to visualize dry fuel
     cylinderSource = vtk.vtkCylinderSource()
     cylinderSource.SetHeight(0.5)
     cylinderSource.SetRadius(0.1)
     cylinderSource.Update()
 
+    # rotate cylinders
     transform = vtk.vtkTransform()
     transform.RotateX(90)
     transform.Update()
 
+    # apply rotation
     transformFilter = vtk.vtkTransformPolyDataFilter()
     transformFilter.SetInputConnection(cylinderSource.GetOutputPort())
     transformFilter.SetTransform(transform)
     transformFilter.Update()
 
+    # place cylinders on datapoints over threshold
     glyph3D = vtk.vtkGlyph3D()
     glyph3D.SetInputConnection(threshold.GetOutputPort())
     glyph3D.SetSourceConnection(transformFilter.GetOutputPort())
@@ -65,22 +105,11 @@ def main():
     mapper = vtk.vtkPolyDataMapper()
     mapper.SetInputConnection(glyph3D.GetOutputPort())
 
-    actor = vtk.vtkActor()
-    actor.SetMapper(mapper)
+    return mapper
 
 
-
-    # ----------------------------------------------------------------
-    # DirectVolume of Fire
-    # ----------------------------------------------------------------
-
-    reader.GetOutput().GetPointData().SetScalars(reader.GetOutput().GetPointData().GetArray('theta'))
-
-    # raycast mapper
-    rayCastMapper = vtk.vtkOpenGLGPUVolumeRayCastMapper()
-    rayCastMapper.SetInputConnection(reader.GetOutputPort())
-    # rayCastMapper.SetInputData(data)
-
+# Transfer function
+def getTransferFunctionProperty():
     min_value = 310
     max_value = 900
 
@@ -105,54 +134,96 @@ def main():
     volumeProperty.ShadeOff()
     volumeProperty.SetInterpolationTypeToLinear()
 
-    # create volume actor and assign mapper and properties
-    volume = vtk.vtkVolume()
-    volume.SetMapper(rayCastMapper)
-    volume.SetProperty(volumeProperty)
+    return volumeProperty;
 
-    # ----------------------------------------------------------------
-    # Wind Streamlines
-    # ----------------------------------------------------------------
 
-    mapper = renderStreamMapper(name)
+# DirectVolume of Fire
+def getFireMapper(reader):
+    # Set scalar field
+    reader.GetOutput().GetPointData().SetScalars(reader.GetOutput().GetPointData().GetArray('theta'))
+    reader.Update()
 
+    # raycast mapper
+    rayCastMapper = vtk.vtkOpenGLGPUVolumeRayCastMapper()
+    rayCastMapper.SetInputConnection(reader.GetOutputPort())
+    return rayCastMapper
+
+
+def getSlider():
+    # create a 2D slider
+    sliderRep = vtk.vtkSliderRepresentation2D()
+    sliderRep.SetMinimumValue(200)
+    sliderRep.SetMaximumValue(300)
+    sliderRep.SetValue(210)
+    sliderRep.SetTitleText("Seedline height")
+    # set color properties
+    sliderRep.GetSliderProperty().SetColor(0.2, 0.2, 0.6)  # Change the color of the knob that slides
+    sliderRep.GetTitleProperty().SetColor(0, 0, 0)  # Change the color of the text indicating what the slider controls
+    sliderRep.GetLabelProperty().SetColor(0, 0, 0.4)  # Change the color of the text displaying the value
+    sliderRep.GetSelectedProperty().SetColor(0.4, 0.8, 0.4)  # Change the color of the knob when the mouse is held on it
+    sliderRep.GetTubeProperty().SetColor(0.7, 0.7, 0.7)  # Change the color of the bar
+    sliderRep.GetCapProperty().SetColor(0.7, 0.7, 0.7)  # Change the color of the ends of the bar
+    # set position of the slider
+    sliderRep.GetPoint1Coordinate().SetCoordinateSystemToDisplay()
+    sliderRep.GetPoint1Coordinate().SetValue(40, 100)
+    sliderRep.GetPoint2Coordinate().SetCoordinateSystemToDisplay()
+    sliderRep.GetPoint2Coordinate().SetValue(200, 100)
+
+    return sliderRep
+
+
+def main():
+    renderer, renderWindow, renderWindowInteractor = getRendererRenderWindowAndInteractor(1920, 1080)
+
+    # read the data set
+    reader = vtk.vtkXMLImageDataReader()
+    name = "data/output.14000.vti"
+    reader.SetFileName(name)
+    reader.Update()
+
+    # create slider for interactive seedline
+    sliderWidget = vtk.vtkSliderWidget()
+    sliderWidget.SetInteractor(renderWindowInteractor)
+    sliderWidget.SetRepresentation(getSlider())
+
+    # create seedline
+    seedline = vtk.vtkLineSource()
+    seedline.SetResolution(100)
+    seedline.SetPoint1(0.0, 300.0, 210.0)
+    seedline.SetPoint2(0.0, -300.0, 210.0)
+
+    # create the callback
+    callback = vtkSliderCallback(seedline)
+    sliderWidget.AddObserver("InteractionEvent", callback)
+    sliderWidget.EnabledOn()
+
+    # create streamline actor
     streamLineActor = vtk.vtkActor()
-    streamLineActor.SetMapper(mapper)
-    streamLineActor.VisibilityOn();
+    streamLineActor.SetMapper(getStreamLineMapper(reader, seedline))
+    streamLineActor.VisibilityOn()
 
-    
-    # ----------------------------------------------------------------
-    # Circle for debuging
-    # ----------------------------------------------------------------
-    colors = vtk.vtkNamedColors()
-    sphereSource = vtk.vtkSphereSource()
-    sphereSource.SetCenter(300.0, 300.0, 300.0)
-    sphereSource.SetRadius(30.0);
-    # Make the surface smooth.
-    sphereSource.SetPhiResolution(100)
-    sphereSource.SetThetaResolution(100)
+    # create dryfuel actor
+    dryFuelActor = vtk.vtkActor()
+    dryFuelActor.SetMapper(getDryFuelMapper(reader))
 
-    newmapper = vtk.vtkPolyDataMapper()
-    newmapper.SetInputConnection(sphereSource.GetOutputPort())
+    # create fire volume
+    fireVolume = vtk.vtkVolume()
+    fireVolume.SetMapper(getFireMapper(reader))
+    fireVolume.SetProperty(getTransferFunctionProperty())
 
-    sphereactor = vtk.vtkActor()
-    sphereactor.SetMapper(newmapper)
-    #sphereactor.GetProperty().SetColor(colors.GetColor3d("Cornsilk").GetData())
-
+    # choose camera angle
     camera = vtk.vtkCamera()
     camera.SetPosition(1700,0,1500)
     camera.SetFocalPoint(50,0,100)
     camera.Roll(270)
-    camera.SetThickness(2500);
+    camera.SetThickness(2500)
     renderer.SetActiveCamera(camera)
 
 
-    # add actor and renders
-    renderer.AddActor(actor)
-    renderer.AddVolume(volume)
-    #renderWindow.AddRenderer(whiteRender)
+    # add actors and renders
+    renderer.AddActor(dryFuelActor)
+    renderer.AddVolume(fireVolume)
     renderer.AddActor(streamLineActor)
-    #renderer.AddActor(sphereactor)
     
     # enter the rendering loop
     renderWindow.Render()
