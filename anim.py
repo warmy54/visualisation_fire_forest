@@ -74,7 +74,7 @@ def main():
     volumeMappers = []
     streamMappers = []
     stream = False
-    for step in range(1,16):
+    for step in range(5,16):
         print(step)
 
         reader = vtk.vtkXMLImageDataReader()
@@ -194,7 +194,7 @@ def main():
     renderWindowInteractor.Initialize()
 
     # Sign up to receive TimerEvent
-    cb = vtkTimerCallback(13, renderWindowInteractor, fuelActor, fuelMappers, volume, volumeMappers,streamActor, streamMappers,names)
+    cb = vtkTimerCallback(10, renderWindowInteractor, fuelActor, fuelMappers, volume, volumeMappers,streamActor, streamMappers,names)
     renderWindowInteractor.AddObserver('TimerEvent', cb.execute)
     cb.timerId = renderWindowInteractor.CreateRepeatingTimer(500)
 
