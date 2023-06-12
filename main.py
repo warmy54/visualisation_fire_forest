@@ -148,7 +148,7 @@ def main():
 
 
     # add actor and renders
-    #renderer.AddActor(actor)
+    renderer.AddActor(actor)
     renderer.AddVolume(volume)
     #renderWindow.AddRenderer(whiteRender)
     renderer.AddActor(streamLineActor)
