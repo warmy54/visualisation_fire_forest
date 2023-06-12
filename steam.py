@@ -54,8 +54,8 @@ def renderStreamMapper(file):
 
     line1 = vtk.vtkLineSource()
     line1.SetResolution(80)
-    line1.SetPoint1(0.0, 300.0, 220.0)
-    line1.SetPoint2(0.0, -300.0, 220.0)
+    line1.SetPoint1(0.0, 300.0, 250.0)
+    line1.SetPoint2(0.0, -300.0, 250.0)
 
     #print(a)
     reader = vtk.vtkXMLImageDataReader()
